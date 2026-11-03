@@ -1,160 +1,509 @@
-function getAllBooks() {
-  var jsonString = localStorage.getItem("myBooks");
-  var jsonObj = JSON.parse(jsonString);
-  console.log(jsonObj);
 
-  for(var i=0; i<jsonObj.books.length; i++) {
-    var trow = document.createElement("tr");
+// ==========================================
+// LOCAL STORAGE HELPER FUNCTIONS
+// ==========================================
 
-    //using innerHTML with template string
-    trow.innerHTML = `
-        <th scope="row">${jsonObj.books[i].bookId}</th>
-        <td>${jsonObj.books[i].bookTitle}</td>
-        <td>${jsonObj.books[i].authorName}</td>
-        <td>${jsonObj.books[i].publisherName}</td>
-        <td class="table_buttons">
-          <a 
-            class="edit" 
-            href="adminBooksEdit.html"
-            onclick="rememberBook('${jsonObj.books[i].bookId}', '${jsonObj.books[i].bookTitle}', '${jsonObj.books[i].authorName}', '${jsonObj.books[i].publisherName}')"
-            title="Edit Book" 
-            data-toggle="tooltip"
-          >
-            <i class="material-icons">edit</i>
-          </a>
-          <a 
-            class="delete" 
-            href="adminBooks.html" 
-            onclick="deleteBookHandler('${jsonObj.books[i].bookTitle}')" 
-            title="Delete Book" 
-            data-toggle="tooltip"
-          >
-            <i class="material-icons">delete</i>
-          </a>
-        </td>`;
+function getBooksData() {
+    var jsonString = localStorage.getItem("myBooks");
 
-    document.getElementsByTagName("tbody")[0].appendChild(trow);
-  }
+    if (!jsonString) {
+        return { books: [] };
+    }
+
+    return JSON.parse(jsonString);
 }
 
+function saveBooksData(jsonObj) {
+    localStorage.setItem("myBooks", JSON.stringify(jsonObj));
+}
+
+
+// ==========================================
+// DISPLAY ALL BOOKS
+// ==========================================
+
+var currentPage = 1;
+var booksPerPage = 5;
+
+function getAllBooks() {
+    var jsonObj = getBooksData();
+    var books = jsonObj.books;
+
+    var tbody = document.getElementsByTagName("tbody")[0];
+
+    tbody.innerHTML = "";
+
+    // Display total book count
+    var countElement = document.getElementById("bookCount");
+
+    if (countElement) {
+        countElement.innerText = "Total Books: " + books.length;
+    }
+
+    // Empty books message
+    if (books.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center;">
+                    No books available.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    var startIndex = (currentPage - 1) * booksPerPage;
+    var endIndex = startIndex + booksPerPage;
+
+    var paginatedBooks = books.slice(startIndex, endIndex);
+
+    paginatedBooks.forEach(function(book) {
+
+        var trow = document.createElement("tr");
+
+        trow.innerHTML = `
+            <th scope="row">${escapeHTML(book.bookId)}</th>
+            <td>${escapeHTML(book.bookTitle)}</td>
+            <td>${escapeHTML(book.authorName)}</td>
+            <td>${escapeHTML(book.publisherName)}</td>
+            <td class="table_buttons">
+                <a class="edit"
+                   href="adminBooksEdit.html"
+                   onclick="rememberBook('${book.bookId}')"
+                   title="Edit Book">
+                    <i class="material-icons">edit</i>
+                </a>
+
+                <a class="delete"
+                   href="adminBooks.html"
+                   onclick="deleteBookHandler('${book.bookId}')"
+                   title="Delete Book">
+                    <i class="material-icons">delete</i>
+                </a>
+            </td>
+        `;
+
+        tbody.appendChild(trow);
+    });
+
+    updatePagination(books.length);
+}
+
+
+// Prevent HTML injection when displaying book data
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, function(char) {
+        return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        }[char];
+    });
+}
+
+
+// ==========================================
+// ADD BOOK
+// ==========================================
 
 function addBookHandler() {
-  //gather entered form data
-  var bookTitle = document.getElementById("addBookTitle").value;
-  var bookAuthor = document.getElementById("addBookAuthor").value;
-  var bookPublisher = document.getElementById("addBookPublisher").value;
-  
-  if(bookTitle==="" || bookAuthor==="" || bookPublisher==="") {
-    alert("Fields cannot be empty.");
-    return;
-  }
-  if(bookTitle.length>25 || bookAuthor.length>25 || bookPublisher.length>25) {
-    alert("Fields cannot exceed 25 characters.");
-    return;
-  }
 
-  var saveObj = {
-    "bookId": 4,
-    "bookTitle": bookTitle,
-    "authorName": bookAuthor,
-    "publisherName": bookPublisher
-  };
+    var bookTitle = document.getElementById("addBookTitle").value.trim();
+    var bookAuthor = document.getElementById("addBookAuthor").value.trim();
+    var bookPublisher = document.getElementById("addBookPublisher").value.trim();
 
-  var jsonString = localStorage.getItem("myBooks");
-  var jsonObj = JSON.parse(jsonString);
+    if (!validateBook(bookTitle, bookAuthor, bookPublisher)) {
+        return;
+    }
 
-  jsonObj.books.push(saveObj);
-  localStorage.setItem("myBooks", JSON.stringify(jsonObj));
-  
-  window.location.href = "adminBooks.html"; //only redirect when successful
+    var jsonObj = getBooksData();
+
+    // Prevent duplicate titles
+    var duplicate = jsonObj.books.some(function(book) {
+        return book.bookTitle.toLowerCase() === bookTitle.toLowerCase();
+    });
+
+    if (duplicate) {
+        alert("A book with this title already exists.");
+        return;
+    }
+
+    // Generate unique ID
+    var nextId = jsonObj.books.length > 0
+        ? Math.max(...jsonObj.books.map(book => Number(book.bookId))) + 1
+        : 1;
+
+    var saveObj = {
+        bookId: nextId,
+        bookTitle: bookTitle,
+        authorName: bookAuthor,
+        publisherName: bookPublisher
+    };
+
+    jsonObj.books.push(saveObj);
+
+    saveBooksData(jsonObj);
+
+    alert("Book added successfully!");
+
+    window.location.href = "adminBooks.html";
 }
 
 
-function rememberBook(id, title, author, publisher) {
-  var saveObj = {
-    "bookId": id,
-    "bookTitle": title,
-    "authorName": author,
-    "publisherName": publisher
-  };
+// ==========================================
+// COMMON VALIDATION
+// ==========================================
 
-  localStorage.setItem("bookToEdit", JSON.stringify(saveObj));
+function validateBook(title, author, publisher) {
+
+    if (title === "" || author === "" || publisher === "") {
+        alert("Fields cannot be empty.");
+        return false;
+    }
+
+    if (title.length > 25 || author.length > 25 || publisher.length > 25) {
+        alert("Fields cannot exceed 25 characters.");
+        return false;
+    }
+
+    return true;
 }
 
+
+// ==========================================
+// REMEMBER SELECTED BOOK FOR EDITING
+// ==========================================
+
+function rememberBook(id) {
+
+    var jsonObj = getBooksData();
+
+    var selectedBook = jsonObj.books.find(function(book) {
+        return String(book.bookId) === String(id);
+    });
+
+    if (!selectedBook) {
+        alert("Book not found.");
+        return;
+    }
+
+    localStorage.setItem("bookToEdit", JSON.stringify(selectedBook));
+}
+
+
+// ==========================================
+// FILL EDIT FORM
+// ==========================================
 
 function fillSelectedBook() {
-  var objString = localStorage.getItem("bookToEdit");
-  var obj = JSON.parse(objString);
 
-  //create the input tags to dynamically inject
-  var editTitleInput = document.createElement("input");
-  editTitleInput.setAttribute("type", "text");
-  editTitleInput.setAttribute("class", "form-control");
-  editTitleInput.setAttribute("id", "editBookTitle");
-  editTitleInput.setAttribute("value", `${obj.bookTitle}`);
-  editTitleInput.setAttribute("placeholder", "Title...");
+    var objString = localStorage.getItem("bookToEdit");
 
-  var editAuthorInput = document.createElement("input");
-  editAuthorInput.setAttribute("type", "text");
-  editAuthorInput.setAttribute("class", "form-control");
-  editAuthorInput.setAttribute("id", "editBookAuthor");
-  editAuthorInput.setAttribute("value", `${obj.authorName}`);
-  editAuthorInput.setAttribute("placeholder", "Author...");
+    if (!objString) {
+        alert("No book selected for editing.");
+        window.location.href = "adminBooks.html";
+        return;
+    }
 
-  var editPublisherInput = document.createElement("input");
-  editPublisherInput.setAttribute("type", "text");
-  editPublisherInput.setAttribute("class", "form-control");
-  editPublisherInput.setAttribute("id", "editBookPublisher");
-  editPublisherInput.setAttribute("value", `${obj.publisherName}`);
-  editPublisherInput.setAttribute("placeholder", "Publisher...");
+    var obj = JSON.parse(objString);
 
-  document.getElementsByClassName("col-sm-10 e1")[0].appendChild(editTitleInput);
-  document.getElementsByClassName("col-sm-10 e2")[0].appendChild(editAuthorInput);
-  document.getElementsByClassName("col-sm-10 e3")[0].appendChild(editPublisherInput);
+    document.getElementById("editBookTitle").value = obj.bookTitle;
+    document.getElementById("editBookAuthor").value = obj.authorName;
+    document.getElementById("editBookPublisher").value = obj.publisherName;
 }
 
 
-//for now, update by title
+// ==========================================
+// UPDATE BOOK
+// ==========================================
+
 function updateBookHandler() {
-  //gather entered form data
-  var newBookTitle = document.getElementById("editBookTitle").value;
-  var newBookAuthor = document.getElementById("editBookAuthor").value;
-  var newBookPublisher = document.getElementById("editBookPublisher").value;
 
-  //get what book to edit via the title
-  var objString = localStorage.getItem("bookToEdit");
-  var obj = JSON.parse(objString);
-  var targetTitle = obj.bookTitle;
+    var newBookTitle = document.getElementById("editBookTitle").value.trim();
+    var newBookAuthor = document.getElementById("editBookAuthor").value.trim();
+    var newBookPublisher = document.getElementById("editBookPublisher").value.trim();
 
-  var jsonString = localStorage.getItem("myBooks");
-  var jsonObj = JSON.parse(jsonString);
-
-  //find the book to edit in myBooks
-  for(var i=0; i<jsonObj.books.length; i++) {
-    //do updates
-    if(jsonObj.books[i].bookTitle === targetTitle) {
-      jsonObj.books[i].bookTitle = newBookTitle;
-      jsonObj.books[i].authorName = newBookAuthor;
-      jsonObj.books[i].publisherName = newBookPublisher;
+    if (!validateBook(newBookTitle, newBookAuthor, newBookPublisher)) {
+        return;
     }
-  }
 
-  //save back to local storage
-  localStorage.setItem("myBooks", JSON.stringify(jsonObj));
+    var objString = localStorage.getItem("bookToEdit");
+
+    if (!objString) {
+        alert("No book selected.");
+        return;
+    }
+
+    var selectedBook = JSON.parse(objString);
+
+    var jsonObj = getBooksData();
+
+    // Check duplicate title, excluding current book
+    var duplicate = jsonObj.books.some(function(book) {
+        return String(book.bookId) !== String(selectedBook.bookId) &&
+            book.bookTitle.toLowerCase() === newBookTitle.toLowerCase();
+    });
+
+    if (duplicate) {
+        alert("Another book with this title already exists.");
+        return;
+    }
+
+    var book = jsonObj.books.find(function(book) {
+        return String(book.bookId) === String(selectedBook.bookId);
+    });
+
+    if (!book) {
+        alert("Book not found.");
+        return;
+    }
+
+    book.bookTitle = newBookTitle;
+    book.authorName = newBookAuthor;
+    book.publisherName = newBookPublisher;
+
+    saveBooksData(jsonObj);
+
+    localStorage.removeItem("bookToEdit");
+
+    alert("Book updated successfully!");
+
+    window.location.href = "adminBooks.html";
 }
 
 
-//for now, delete by title
-function deleteBookHandler(title) {
-  var jsonString = localStorage.getItem("myBooks");
-  var jsonObj = JSON.parse(jsonString);
+// ==========================================
+// DELETE BOOK
+// ==========================================
 
-  for(var i=0; i<jsonObj.books.length; i++) {
-    if(jsonObj.books[i].bookTitle === title) {
-      jsonObj.books.splice(i, 1);  //remove 1 item from books array which is target obj i
-      break;
+function deleteBookHandler(id) {
+
+    if (!confirm("Are you sure you want to delete this book?")) {
+        return false;
     }
-  }
 
-  localStorage.setItem("myBooks", JSON.stringify(jsonObj));
+    var jsonObj = getBooksData();
+
+    var initialLength = jsonObj.books.length;
+
+    jsonObj.books = jsonObj.books.filter(function(book) {
+        return String(book.bookId) !== String(id);
+    });
+
+    if (jsonObj.books.length === initialLength) {
+        alert("Book not found.");
+        return false;
+    }
+
+    saveBooksData(jsonObj);
+
+    alert("Book deleted successfully!");
+
+    return true;
+}
+
+
+// ==========================================
+// SEARCH BOOKS
+// ==========================================
+
+function searchBooks() {
+
+    var searchValue = document.getElementById("searchBook").value.toLowerCase();
+
+    var jsonObj = getBooksData();
+
+    var filteredBooks = jsonObj.books.filter(function(book) {
+
+        return book.bookTitle.toLowerCase().includes(searchValue) ||
+            book.authorName.toLowerCase().includes(searchValue) ||
+            book.publisherName.toLowerCase().includes(searchValue);
+    });
+
+    displayFilteredBooks(filteredBooks);
+}
+
+function displayFilteredBooks(books) {
+
+    var tbody = document.getElementsByTagName("tbody")[0];
+
+    tbody.innerHTML = "";
+
+    if (books.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center;">
+                    No matching books found.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    books.forEach(function(book) {
+
+        var trow = document.createElement("tr");
+
+        trow.innerHTML = `
+            <th>${escapeHTML(book.bookId)}</th>
+            <td>${escapeHTML(book.bookTitle)}</td>
+            <td>${escapeHTML(book.authorName)}</td>
+            <td>${escapeHTML(book.publisherName)}</td>
+            <td>
+                <a href="adminBooksEdit.html"
+                   onclick="rememberBook('${book.bookId}')">
+                    <i class="material-icons">edit</i>
+                </a>
+
+                <a href="adminBooks.html"
+                   onclick="deleteBookHandler('${book.bookId}')">
+                    <i class="material-icons">delete</i>
+                </a>
+            </td>
+        `;
+
+        tbody.appendChild(trow);
+    });
+}
+
+
+// ==========================================
+// SORT BOOKS
+// ==========================================
+
+function sortBooks(field, order) {
+
+    var jsonObj = getBooksData();
+
+    jsonObj.books.sort(function(a, b) {
+
+        var valueA = a[field].toLowerCase();
+        var valueB = b[field].toLowerCase();
+
+        if (valueA < valueB) return order === "asc" ? -1 : 1;
+        if (valueA > valueB) return order === "asc" ? 1 : -1;
+
+        return 0;
+    });
+
+    saveBooksData(jsonObj);
+
+    currentPage = 1;
+
+    getAllBooks();
+}
+
+
+// ==========================================
+// CLEAR ALL BOOKS
+// ==========================================
+
+function clearAllBooks() {
+
+    if (!confirm("Are you sure you want to delete ALL books?")) {
+        return;
+    }
+
+    saveBooksData({ books: [] });
+
+    currentPage = 1;
+
+    alert("All books deleted successfully!");
+
+    getAllBooks();
+}
+
+
+// ==========================================
+// RESET ADD BOOK FORM
+// ==========================================
+
+function resetBookForm() {
+
+    document.getElementById("addBookTitle").value = "";
+    document.getElementById("addBookAuthor").value = "";
+    document.getElementById("addBookPublisher").value = "";
+}
+
+
+// ==========================================
+// EXPORT BOOKS TO CSV
+// ==========================================
+
+function exportBooksToCSV() {
+
+    var jsonObj = getBooksData();
+
+    if (jsonObj.books.length === 0) {
+        alert("No books available to export.");
+        return;
+    }
+
+    var csvData = [
+        ["Book ID", "Book Title", "Author", "Publisher"],
+        ...jsonObj.books.map(function(book) {
+            return [
+                book.bookId,
+                book.bookTitle,
+                book.authorName,
+                book.publisherName
+            ];
+        })
+    ];
+
+    var csvContent = csvData.map(function(row) {
+        return row.map(function(value) {
+            return '"' + String(value).replace(/"/g, '""') + '"';
+        }).join(",");
+    }).join("\n");
+
+    var blob = new Blob([csvContent], {
+        type: "text/csv;charset=utf-8;"
+    });
+
+    var link = document.createElement("a");
+
+    link.href = URL.createObjectURL(blob);
+    link.download = "books.csv";
+
+    link.click();
+
+    URL.revokeObjectURL(link.href);
+}
+
+
+// ==========================================
+// PAGINATION
+// ==========================================
+
+function updatePagination(totalBooks) {
+
+    var totalPages = Math.ceil(totalBooks / booksPerPage);
+
+    var pagination = document.getElementById("pagination");
+
+    if (!pagination) return;
+
+    pagination.innerHTML = "";
+
+    for (var i = 1; i <= totalPages; i++) {
+
+        var button = document.createElement("button");
+
+        button.innerText = i;
+        button.className = "page-button";
+
+        if (i === currentPage) {
+            button.disabled = true;
+        }
+
+        button.onclick = function() {
+            currentPage = Number(this.innerText);
+            getAllBooks();
+        };
+
+        pagination.appendChild(button);
+    }
 }
