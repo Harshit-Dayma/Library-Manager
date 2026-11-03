@@ -38,6 +38,54 @@
       </nav>
     </div>
 
+    
+<!-- Book count -->
+<h4 id="bookCount">Total Books: 0</h4>
+
+<!-- Search -->
+<input
+    type="text"
+    id="searchBook"
+    placeholder="Search by title, author or publisher..."
+    oninput="searchBooks()"
+>
+
+<!-- Sorting -->
+<select onchange="sortBooks(this.value, 'asc')">
+    <option value="">Sort Books</option>
+    <option value="bookTitle">Title (A-Z)</option>
+    <option value="authorName">Author (A-Z)</option>
+    <option value="publisherName">Publisher (A-Z)</option>
+</select>
+
+<button onclick="sortBooks('bookTitle', 'desc')">
+    Sort Title Z-A
+</button>
+
+<!-- Other actions -->
+<button onclick="clearAllBooks()">Clear All Books</button>
+
+<button onclick="exportBooksToCSV()">Export CSV</button>
+
+<!-- Existing table -->
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Book Title</th>
+            <th>Author</th>
+            <th>Publisher</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+
+    <tbody></tbody>
+</table>
+
+<!-- Pagination -->
+<div id="pagination"></div>
+
+
     <div class="adminDash_right">
       <div class="adminTable table-responsive">    
         <div class="table-title">
