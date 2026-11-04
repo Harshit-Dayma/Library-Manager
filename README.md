@@ -7,7 +7,7 @@
 ## 🌟 Features
 
 - 🔐 **Admin Page**
-  - Manage librarian and borrower accounts
+  - Manage librarian and borrower account
   - Dashboard for system overview
 
 - 👩‍🏫 **Librarian Page**
